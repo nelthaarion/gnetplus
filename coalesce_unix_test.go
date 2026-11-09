@@ -14,7 +14,7 @@
 
 //go:build darwin || dragonfly || freebsd || linux || netbsd || openbsd
 
-package gnet
+package gnetplus
 
 import (
 	"bytes"

@@ -1,6 +1,6 @@
 //go:build darwin || dragonfly || freebsd || linux || netbsd || openbsd
 
-package gnet
+package gnetplus
 
 import (
 	"context"
@@ -20,9 +20,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/sys/unix"
 
-	errorx "github.com/nelthaarion/gnet/v2/pkg/errors"
-	"github.com/nelthaarion/gnet/v2/pkg/logging"
-	goPool "github.com/nelthaarion/gnet/v2/pkg/pool/goroutine"
+	errorx "github.com/nelthaarion/gnetplus/v2/pkg/errors"
+	"github.com/nelthaarion/gnetplus/v2/pkg/logging"
+	goPool "github.com/nelthaarion/gnetplus/v2/pkg/pool/goroutine"
 )
 
 var SysClose = unix.Close

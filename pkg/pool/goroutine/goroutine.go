@@ -20,7 +20,7 @@ import (
 
 	"github.com/nelthaarion/ants/v2"
 
-	"github.com/nelthaarion/gnet/v2/pkg/logging"
+	"github.com/nelthaarion/gnetplus/v2/pkg/logging"
 )
 
 const (

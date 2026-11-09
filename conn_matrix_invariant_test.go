@@ -14,7 +14,7 @@
 
 //go:build (darwin || dragonfly || freebsd || linux || netbsd || openbsd) && gc_opt
 
-package gnet
+package gnetplus
 
 import (
 	"fmt"
@@ -26,7 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
 
-	"github.com/nelthaarion/gnet/v2/internal/gfd"
+	"github.com/nelthaarion/gnetplus/v2/internal/gfd"
 )
 
 // TestConnMatrixDelLastConnIsNotOverwritten pins down the regression that the

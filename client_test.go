@@ -1,6 +1,6 @@
 //go:build darwin || dragonfly || freebsd || linux || netbsd || openbsd || windows
 
-package gnet
+package gnetplus
 
 import (
 	"bytes"
@@ -18,10 +18,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
-	errorx "github.com/nelthaarion/gnet/v2/pkg/errors"
-	"github.com/nelthaarion/gnet/v2/pkg/logging"
-	bbPool "github.com/nelthaarion/gnet/v2/pkg/pool/bytebuffer"
-	goPool "github.com/nelthaarion/gnet/v2/pkg/pool/goroutine"
+	errorx "github.com/nelthaarion/gnetplus/v2/pkg/errors"
+	"github.com/nelthaarion/gnetplus/v2/pkg/logging"
+	bbPool "github.com/nelthaarion/gnetplus/v2/pkg/pool/bytebuffer"
+	goPool "github.com/nelthaarion/gnetplus/v2/pkg/pool/goroutine"
 )
 
 type connHandler struct {

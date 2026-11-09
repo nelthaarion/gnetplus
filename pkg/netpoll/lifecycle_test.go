@@ -7,8 +7,8 @@ import (
 	"sync"
 	"testing"
 
-	errorx "github.com/nelthaarion/gnet/v2/pkg/errors"
-	"github.com/nelthaarion/gnet/v2/pkg/queue"
+	errorx "github.com/nelthaarion/gnetplus/v2/pkg/errors"
+	"github.com/nelthaarion/gnetplus/v2/pkg/queue"
 )
 
 func TestTriggerConcurrentClose(t *testing.T) {

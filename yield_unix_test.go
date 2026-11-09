@@ -14,7 +14,7 @@
 
 //go:build linux
 
-package gnet
+package gnetplus
 
 import (
 	"fmt"

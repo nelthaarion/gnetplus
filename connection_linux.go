@@ -15,14 +15,14 @@
  *
  */
 
-package gnet
+package gnetplus
 
 import (
 	"io"
 
 	"golang.org/x/sys/unix"
 
-	"github.com/nelthaarion/gnet/v2/pkg/netpoll"
+	"github.com/nelthaarion/gnetplus/v2/pkg/netpoll"
 )
 
 func (c *conn) processIO(_ int, ev netpoll.IOEvent, _ netpoll.IOFlags) error {

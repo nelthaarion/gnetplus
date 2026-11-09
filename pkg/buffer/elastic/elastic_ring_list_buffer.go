@@ -18,8 +18,8 @@ import (
 	"io"
 	"math"
 
-	"github.com/nelthaarion/gnet/v2/pkg/buffer/linkedlist"
-	errorx "github.com/nelthaarion/gnet/v2/pkg/errors"
+	"github.com/nelthaarion/gnetplus/v2/pkg/buffer/linkedlist"
+	errorx "github.com/nelthaarion/gnetplus/v2/pkg/errors"
 )
 
 // Buffer combines ring-buffer and list-buffer.

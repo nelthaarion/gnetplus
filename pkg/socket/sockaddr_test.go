@@ -24,7 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
 
-	bsPool "github.com/nelthaarion/gnet/v2/pkg/pool/byteslice"
+	bsPool "github.com/nelthaarion/gnetplus/v2/pkg/pool/byteslice"
 )
 
 // poisonPool returns 32-byte blocks to the pool with their contents set to c, so

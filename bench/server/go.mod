@@ -2,9 +2,9 @@ module gnet-bench-server
 
 go 1.26.0
 
-replace github.com/nelthaarion/gnet/v2 => ../../
+replace github.com/nelthaarion/gnetplus/v2 => ../../
 
-require github.com/nelthaarion/gnet/v2 v2.0.0-00010101000000-000000000000
+require github.com/nelthaarion/gnetplus/v2 v2.0.0-00010101000000-000000000000
 
 require (
 	github.com/nelthaarion/ants/v2 v2.12.1 // indirect

@@ -24,7 +24,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/nelthaarion/gnet/v2"
+	"github.com/nelthaarion/gnetplus/v2"
 )
 
 var (
@@ -63,7 +63,7 @@ var requests [64]struct {
 	_ [56]byte // pad to a cache line
 }
 
-func countRequest(c gnet.Conn) { requests[c.Fd()&63].n.Add(1) }
+func countRequest(c gnetplus.Conn) { requests[c.Fd()&63].n.Add(1) }
 
 func totalRequests() (t int64) {
 	for i := range requests {
@@ -73,30 +73,30 @@ func totalRequests() (t int64) {
 }
 
 type server struct {
-	gnet.BuiltinEventEngine
+	gnetplus.BuiltinEventEngine
 	keepAlive []byte // precomputed 200 response, read-only after boot
 	closeResp []byte // same, but asks the client to close
 }
 
-func (s *server) OnBoot(eng gnet.Engine) gnet.Action {
+func (s *server) OnBoot(eng gnetplus.Engine) gnetplus.Action {
 	fmt.Fprintf(os.Stderr, "gnet-bench boot pid=%d mode=%s addr=%s loops=%d multicore=%v reuseport=%v lb=%s et=%v body=%d noyield=%v lockthread=%v\n",
 		os.Getpid(), *mode, *addr, *loops, *multicore, *reusePort, *lb, *et, *bodySize, *noYield, *lockOS)
-	return gnet.None
+	return gnetplus.None
 }
 
-func (s *server) OnOpen(c gnet.Conn) ([]byte, gnet.Action) {
+func (s *server) OnOpen(c gnetplus.Conn) ([]byte, gnetplus.Action) {
 	conns.Add(1)
-	return nil, gnet.None
+	return nil, gnetplus.None
 }
 
-func (s *server) OnClose(c gnet.Conn, err error) gnet.Action {
+func (s *server) OnClose(c gnetplus.Conn, err error) gnetplus.Action {
 	conns.Add(-1)
-	return gnet.None
+	return gnetplus.None
 }
 
-func (s *server) OnTick() (time.Duration, gnet.Action) { return 5 * time.Second, gnet.None }
+func (s *server) OnTick() (time.Duration, gnetplus.Action) { return 5 * time.Second, gnetplus.None }
 
-func (s *server) OnTraffic(c gnet.Conn) gnet.Action {
+func (s *server) OnTraffic(c gnetplus.Conn) gnetplus.Action {
 	if httpMode {
 		return s.serveHTTP(c)
 	}
@@ -108,40 +108,40 @@ func (s *server) OnTraffic(c gnet.Conn) gnet.Action {
 	// it; Discard consumes it.
 	buf, err := c.Peek(-1)
 	if err != nil {
-		return gnet.Close
+		return gnetplus.Close
 	}
 	if len(buf) == 0 {
-		return gnet.None
+		return gnetplus.None
 	}
 	n, err := c.Write(buf)
 	if err != nil {
 		errors.Add(1)
-		return gnet.Close
+		return gnetplus.Close
 	}
 	if _, err := c.Discard(n); err != nil {
 		errors.Add(1)
-		return gnet.Close
+		return gnetplus.Close
 	}
 	countRequest(c)
-	return gnet.None
+	return gnetplus.None
 }
 
-func (s *server) serveHTTP(c gnet.Conn) gnet.Action {
+func (s *server) serveHTTP(c gnetplus.Conn) gnetplus.Action {
 	for {
 		buf, err := c.Peek(-1)
 		if err != nil {
-			return gnet.Close
+			return gnetplus.Close
 		}
 		if len(buf) == 0 {
-			return gnet.None
+			return gnetplus.None
 		}
 		// Headers must be complete before we can answer.
 		end := bytes.Index(buf, crlfcrlf)
 		if end < 0 {
 			if len(buf) > 1<<20 {
-				return gnet.Close
+				return gnetplus.Close
 			}
-			return gnet.None
+			return gnetplus.None
 		}
 
 		// Body length and Connection header of this request. The parse does not
@@ -150,7 +150,7 @@ func (s *server) serveHTTP(c gnet.Conn) gnet.Action {
 		need, wantClose := parseHead(buf[:end+4])
 		consumed := end + 4 + need
 		if len(buf) < consumed {
-			return gnet.None // body still arriving
+			return gnetplus.None // body still arriving
 		}
 
 		out := s.keepAlive
@@ -158,18 +158,18 @@ func (s *server) serveHTTP(c gnet.Conn) gnet.Action {
 			out = s.closeResp
 		}
 		if _, err := c.Write(out); err != nil {
-			return gnet.Close
+			return gnetplus.Close
 		}
 		// Consume exactly this request. The old code discarded len(buf), i.e. every
 		// byte that had arrived, which silently dropped pipelined requests that
 		// followed the first one and left the client waiting for answers that never
 		// came - the "http" workload could not be pipelined at all.
 		if _, err := c.Discard(consumed); err != nil {
-			return gnet.Close
+			return gnetplus.Close
 		}
 		countRequest(c)
 		if wantClose {
-			return gnet.Close
+			return gnetplus.Close
 		}
 	}
 }
@@ -178,18 +178,18 @@ func (s *server) serveHTTP(c gnet.Conn) gnet.Action {
 // a goroutine is started for it, and the answer goes back through AsyncWrite. It exists to
 // measure how the engine behaves when goroutines are made runnable by the callbacks, which is
 // the case that the poller's idle-time Gosched (and Options.NoPollYield) is about.
-func (s *server) serveAsync(c gnet.Conn) gnet.Action {
+func (s *server) serveAsync(c gnetplus.Conn) gnetplus.Action {
 	buf, err := c.Next(-1)
 	if err != nil {
-		return gnet.Close
+		return gnetplus.Close
 	}
 	if len(buf) == 0 {
-		return gnet.None
+		return gnetplus.None
 	}
 	data := append([]byte(nil), buf...)
 	countRequest(c)
 	go func() { _ = c.AsyncWrite(data, nil) }()
-	return gnet.None
+	return gnetplus.None
 }
 
 var crlfcrlf = []byte("\r\n\r\n")
@@ -299,37 +299,37 @@ func main() {
 	s.keepAlive = buildResponse("keep-alive", *bodySize)
 	s.closeResp = buildResponse("close", *bodySize)
 
-	opts := []gnet.Option{
-		gnet.WithMulticore(*multicore),
-		gnet.WithReusePort(*reusePort),
-		gnet.WithReadBufferCap(*readBuf),
-		gnet.WithWriteBufferCap(*writeBuf),
+	opts := []gnetplus.Option{
+		gnetplus.WithMulticore(*multicore),
+		gnetplus.WithReusePort(*reusePort),
+		gnetplus.WithReadBufferCap(*readBuf),
+		gnetplus.WithWriteBufferCap(*writeBuf),
 	}
 	switch *lb {
 	case "lc":
-		opts = append(opts, gnet.WithLoadBalancing(gnet.LeastConnections))
+		opts = append(opts, gnetplus.WithLoadBalancing(gnetplus.LeastConnections))
 	case "hash":
-		opts = append(opts, gnet.WithLoadBalancing(gnet.SourceAddrHash))
+		opts = append(opts, gnetplus.WithLoadBalancing(gnetplus.SourceAddrHash))
 	default:
-		opts = append(opts, gnet.WithLoadBalancing(gnet.RoundRobin))
+		opts = append(opts, gnetplus.WithLoadBalancing(gnetplus.RoundRobin))
 	}
 	if *loops > 0 {
-		opts = append(opts, gnet.WithNumEventLoop(*loops))
+		opts = append(opts, gnetplus.WithNumEventLoop(*loops))
 	}
 	if *et {
-		opts = append(opts, gnet.WithEdgeTriggeredIO(true))
+		opts = append(opts, gnetplus.WithEdgeTriggeredIO(true))
 	}
 	if *noYield {
-		opts = append(opts, gnet.WithNoPollYield(true))
+		opts = append(opts, gnetplus.WithNoPollYield(true))
 	}
 	if *forceYield {
-		opts = append(opts, gnet.WithAlwaysPollYield(true))
+		opts = append(opts, gnetplus.WithAlwaysPollYield(true))
 	}
 	if *noCoalesce {
-		opts = append(opts, gnet.WithNoWriteCoalescing(true))
+		opts = append(opts, gnetplus.WithNoWriteCoalescing(true))
 	}
 	if *lockOS {
-		opts = append(opts, gnet.WithLockOSThread(true))
+		opts = append(opts, gnetplus.WithLockOSThread(true))
 	}
 
 	if strings.Contains(*addr, "://") == false {
@@ -344,8 +344,8 @@ func main() {
 		}
 	}()
 
-	if err := gnet.Run(s, *addr, opts...); err != nil {
-		fmt.Fprintln(os.Stderr, "gnet.Run:", err)
+	if err := gnetplus.Run(s, *addr, opts...); err != nil {
+		fmt.Fprintln(os.Stderr, "gnetplus.Run:", err)
 		os.Exit(1)
 	}
 }

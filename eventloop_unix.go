@@ -14,7 +14,7 @@
 
 //go:build darwin || dragonfly || freebsd || linux || netbsd || openbsd
 
-package gnet
+package gnetplus
 
 import (
 	"context"
@@ -31,13 +31,13 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	errorx "github.com/nelthaarion/gnet/v2/pkg/errors"
-	gio "github.com/nelthaarion/gnet/v2/pkg/io"
-	"github.com/nelthaarion/gnet/v2/pkg/logging"
-	"github.com/nelthaarion/gnet/v2/pkg/netpoll"
-	"github.com/nelthaarion/gnet/v2/pkg/pool/goroutine"
-	"github.com/nelthaarion/gnet/v2/pkg/queue"
-	"github.com/nelthaarion/gnet/v2/pkg/socket"
+	errorx "github.com/nelthaarion/gnetplus/v2/pkg/errors"
+	gio "github.com/nelthaarion/gnetplus/v2/pkg/io"
+	"github.com/nelthaarion/gnetplus/v2/pkg/logging"
+	"github.com/nelthaarion/gnetplus/v2/pkg/netpoll"
+	"github.com/nelthaarion/gnetplus/v2/pkg/pool/goroutine"
+	"github.com/nelthaarion/gnetplus/v2/pkg/queue"
+	"github.com/nelthaarion/gnetplus/v2/pkg/socket"
 )
 
 type eventloop struct {

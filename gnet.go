@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package gnet implements a high-performance, lightweight, non-blocking,
+// package gnetplus implements a high-performance, lightweight, non-blocking,
 // event-driven networking framework written in pure Go.
 //
-// Visit https://gnet.host/ for more details about gnet.
-package gnet
+// Visit https://gnetplus.host/ for more details about gnetplus.
+package gnetplus
 
 import (
 	"context"
@@ -29,11 +29,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nelthaarion/gnet/v2/internal/gfd"
-	"github.com/nelthaarion/gnet/v2/pkg/buffer/ring"
-	errorx "github.com/nelthaarion/gnet/v2/pkg/errors"
-	"github.com/nelthaarion/gnet/v2/pkg/logging"
-	"github.com/nelthaarion/gnet/v2/pkg/math"
+	"github.com/nelthaarion/gnetplus/v2/internal/gfd"
+	"github.com/nelthaarion/gnetplus/v2/pkg/buffer/ring"
+	errorx "github.com/nelthaarion/gnetplus/v2/pkg/errors"
+	"github.com/nelthaarion/gnetplus/v2/pkg/logging"
+	"github.com/nelthaarion/gnetplus/v2/pkg/math"
 )
 
 // Action is an action that occurs after the completion of an event.
@@ -306,11 +306,11 @@ type (
 	BuiltinEventEngine struct{}
 )
 
-func (*BuiltinEventEngine) OnBoot(_ Engine) (action Action)          { return }
-func (*BuiltinEventEngine) OnShutdown(_ Engine)                      {}
-func (*BuiltinEventEngine) OnOpen(_ Conn) (out []byte, action Action) { return }
-func (*BuiltinEventEngine) OnClose(_ Conn, _ error) (action Action)  { return }
-func (*BuiltinEventEngine) OnTraffic(_ Conn) (action Action)         { return }
+func (*BuiltinEventEngine) OnBoot(_ Engine) (action Action)              { return }
+func (*BuiltinEventEngine) OnShutdown(_ Engine)                          {}
+func (*BuiltinEventEngine) OnOpen(_ Conn) (out []byte, action Action)    { return }
+func (*BuiltinEventEngine) OnClose(_ Conn, _ error) (action Action)      { return }
+func (*BuiltinEventEngine) OnTraffic(_ Conn) (action Action)             { return }
 func (*BuiltinEventEngine) OnTick() (delay time.Duration, action Action) { return }
 
 // MaxStreamBufferCap is the default buffer size for each stream-oriented connection(TCP/Unix).
@@ -468,7 +468,7 @@ var (
 // Stop gracefully shuts down the engine without interrupting any active event-loops.
 //
 // Deprecated: The global Stop only shuts down the last registered Engine with the same
-// protocol and IP:Port. If you invoke gnet.Run multiple times with the same address
+// protocol and IP:Port. If you invoke gnetplus.Run multiple times with the same address
 // (using WithReuseAddr/WithReusePort), previous engines are leaked in allEngines.
 // Use Engine.Stop instead.
 //
@@ -483,10 +483,10 @@ var (
 //     Fixed by removing the premature isShutdown() check entirely and letting the
 //     poll loop below handle the correct terminal state.
 //
-// FIX S-4: If two goroutines call gnet.Run with the same address concurrently,
+// FIX S-4: If two goroutines call gnetplus.Run with the same address concurrently,
 // a plain Store would overwrite the first entry in allEngines without shutting
 // the first engine down — causing a goroutine and fd leak, and leaving an engine
-// that gnet.Stop can no longer reach. run() now detects the clash with LoadOrStore
+// that gnetplus.Stop can no longer reach. run() now detects the clash with LoadOrStore
 // before it overwrites, and warns. The previous version of this comment described
 // that fix while the code still did an unconditional Store (see engine_unix.go and
 // engine_windows.go, where the FIX S-4 handling actually lives).

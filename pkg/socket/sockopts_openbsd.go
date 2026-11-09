@@ -14,7 +14,7 @@
 
 package socket
 
-import errorx "github.com/nelthaarion/gnet/v2/pkg/errors"
+import errorx "github.com/nelthaarion/gnetplus/v2/pkg/errors"
 
 // SetKeepAlivePeriod is not implemented on OpenBSD because there are
 // no equivalents of Linux's TCP_KEEPIDLE, TCP_KEEPINTVL, and TCP_KEEPCNT.

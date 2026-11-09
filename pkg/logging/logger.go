@@ -16,8 +16,8 @@
 // it sets up a default logger (powered by go.uber.org/zap)
 // that is about to be used by your gnet application.
 // You're allowed to replace the default logger with your customized logger by
-// implementing Logger and assign it to the functional option via gnet.WithLogger,
-// and then passing it to gnet.Run or gnet.Rotate.
+// implementing Logger and assign it to the functional option via gnetplus.WithLogger,
+// and then passing it to gnetplus.Run or gnetplus.Rotate.
 //
 // The environment variable `GNET_LOGGING_LEVEL` determines which zap logger level will be applied for logging.
 // The environment variable `GNET_LOGGING_FILE` is set to a local file path when you want to print logs into local file.
@@ -104,7 +104,7 @@ func init() {
 		defaultLoggingLevel = Level(loggingLevel)
 	}
 
-	// Initializes the inside default logger of gnet.
+	// Initializes the inside default logger of gnetplus.
 	fileName := os.Getenv("GNET_LOGGING_FILE")
 	if len(fileName) > 0 {
 		var err error

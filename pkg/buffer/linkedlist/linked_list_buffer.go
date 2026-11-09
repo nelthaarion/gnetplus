@@ -19,7 +19,7 @@ import (
 	"io"
 	"math"
 
-	bsPool "github.com/nelthaarion/gnet/v2/pkg/pool/byteslice"
+	bsPool "github.com/nelthaarion/gnetplus/v2/pkg/pool/byteslice"
 )
 
 type node struct {

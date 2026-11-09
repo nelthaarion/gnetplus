@@ -1,4 +1,4 @@
-package gnet
+package gnetplus
 
 // Benchmarks and regression tests for the Windows inbound pipeline - the path
 // every byte of inbound stream data takes from the per-connection reader
@@ -22,8 +22,8 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/nelthaarion/gnet/v2/pkg/logging"
-	bbPool "github.com/nelthaarion/gnet/v2/pkg/pool/bytebuffer"
+	"github.com/nelthaarion/gnetplus/v2/pkg/logging"
+	bbPool "github.com/nelthaarion/gnetplus/v2/pkg/pool/bytebuffer"
 )
 
 // benchEchoEvents is the OnTraffic side of the echo/RPC workload: consume

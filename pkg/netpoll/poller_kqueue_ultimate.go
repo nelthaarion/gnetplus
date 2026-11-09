@@ -26,9 +26,9 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	errorx "github.com/nelthaarion/gnet/v2/pkg/errors"
-	"github.com/nelthaarion/gnet/v2/pkg/logging"
-	"github.com/nelthaarion/gnet/v2/pkg/queue"
+	errorx "github.com/nelthaarion/gnetplus/v2/pkg/errors"
+	"github.com/nelthaarion/gnetplus/v2/pkg/logging"
+	"github.com/nelthaarion/gnetplus/v2/pkg/queue"
 )
 
 // Poller represents a poller which is in charge of monitoring file-descriptors.
@@ -36,7 +36,7 @@ type Poller struct {
 	pollYield // scheduler-yield policy, see SetYield
 
 	// Polling must return before Close; concurrent Trigger calls are synchronized.
-	lifecycle sync.RWMutex
+	lifecycle                   sync.RWMutex
 	fd                          int
 	pipe                        []int
 	wakeupCall                  int32

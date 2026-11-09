@@ -14,17 +14,16 @@
 
 //go:build darwin || dragonfly || freebsd || linux || netbsd || openbsd
 
-package gnet
+package gnetplus
 
 import (
 	"runtime"
 
+	"github.com/nelthaarion/gnetplus/v2/pkg/errors"
+	"github.com/nelthaarion/gnetplus/v2/pkg/netpoll"
+	"github.com/nelthaarion/gnetplus/v2/pkg/queue"
+	"github.com/nelthaarion/gnetplus/v2/pkg/socket"
 	"golang.org/x/sys/unix"
-
-	"github.com/nelthaarion/gnet/v2/pkg/errors"
-	"github.com/nelthaarion/gnet/v2/pkg/netpoll"
-	"github.com/nelthaarion/gnet/v2/pkg/queue"
-	"github.com/nelthaarion/gnet/v2/pkg/socket"
 )
 
 func (el *eventloop) accept0(fd int, _ netpoll.IOEvent, _ netpoll.IOFlags) error {

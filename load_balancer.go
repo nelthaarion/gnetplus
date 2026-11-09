@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package gnet
+package gnetplus
 
 import (
 	"hash/crc32"
 	"net"
 	"sync/atomic"
 
-	"github.com/nelthaarion/gnet/v2/pkg/bs"
-	"github.com/nelthaarion/gnet/v2/pkg/logging"
+	"github.com/nelthaarion/gnetplus/v2/pkg/bs"
+	"github.com/nelthaarion/gnetplus/v2/pkg/logging"
 )
 
 // LoadBalancing represents the type of load-balancing algorithm.

@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package gnet
+package gnetplus
 
 import (
 	"time"
 
-	"github.com/nelthaarion/gnet/v2/pkg/logging"
+	"github.com/nelthaarion/gnetplus/v2/pkg/logging"
 )
 
 // Option is a function that will set up option.
@@ -151,7 +151,7 @@ type Options struct {
 	// OnClose instead of as the error of the Write call, and the data of a held-back Write leaves
 	// when the callback returns rather than inside it (call Conn.Flush to push it out earlier).
 	// Set NoWriteCoalescing for the strict "every Write is a write(2) right now" behavior of
-	// upstream gnet.
+	// upstream gnetplus.
 	NoWriteCoalescing bool
 
 	// Ticker indicates whether the ticker has been set up.
@@ -238,7 +238,7 @@ func WithLockOSThread(lockOSThread bool) Option {
 }
 
 // WithNoWriteCoalescing turns off write coalescing, see Options.NoWriteCoalescing: every Write goes
-// to the kernel immediately, as in upstream gnet.
+// to the kernel immediately, as in upstream gnetplus.
 func WithNoWriteCoalescing(noWriteCoalescing bool) Option {
 	return func(opts *Options) {
 		opts.NoWriteCoalescing = noWriteCoalescing

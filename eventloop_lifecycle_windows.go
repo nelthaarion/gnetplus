@@ -1,10 +1,10 @@
-package gnet
+package gnetplus
 
 import (
 	"errors"
 
-	errorx "github.com/nelthaarion/gnet/v2/pkg/errors"
-	bbPool "github.com/nelthaarion/gnet/v2/pkg/pool/bytebuffer"
+	errorx "github.com/nelthaarion/gnetplus/v2/pkg/errors"
+	bbPool "github.com/nelthaarion/gnetplus/v2/pkg/pool/bytebuffer"
 )
 
 // ErrEventQueueFull means a nonblocking event submission was not accepted.

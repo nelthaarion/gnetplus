@@ -1,4 +1,4 @@
-package gnet
+package gnetplus
 
 import (
 	"bytes"
@@ -6,7 +6,7 @@ import (
 	"io"
 	"testing"
 
-	bbPool "github.com/nelthaarion/gnet/v2/pkg/pool/bytebuffer"
+	bbPool "github.com/nelthaarion/gnetplus/v2/pkg/pool/bytebuffer"
 )
 
 type suffixTestWriter struct {

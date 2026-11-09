@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package gnet
+package gnetplus
 
 import (
 	"context"
@@ -24,11 +24,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	errorx "github.com/nelthaarion/gnet/v2/pkg/errors"
-	"github.com/nelthaarion/gnet/v2/pkg/logging"
-	bbPool "github.com/nelthaarion/gnet/v2/pkg/pool/bytebuffer"
-	bsPool "github.com/nelthaarion/gnet/v2/pkg/pool/byteslice"
-	"github.com/nelthaarion/gnet/v2/pkg/pool/goroutine"
+	errorx "github.com/nelthaarion/gnetplus/v2/pkg/errors"
+	"github.com/nelthaarion/gnetplus/v2/pkg/logging"
+	bbPool "github.com/nelthaarion/gnetplus/v2/pkg/pool/bytebuffer"
+	bsPool "github.com/nelthaarion/gnetplus/v2/pkg/pool/byteslice"
+	"github.com/nelthaarion/gnetplus/v2/pkg/pool/goroutine"
 )
 
 // maxUDPDatagramSize is the largest payload a UDP datagram can carry.

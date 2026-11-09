@@ -1,4 +1,4 @@
-package gnet
+package gnetplus
 
 import (
 	"bufio"
@@ -25,10 +25,10 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
-	errorx "github.com/nelthaarion/gnet/v2/pkg/errors"
-	"github.com/nelthaarion/gnet/v2/pkg/logging"
-	bbPool "github.com/nelthaarion/gnet/v2/pkg/pool/bytebuffer"
-	goPool "github.com/nelthaarion/gnet/v2/pkg/pool/goroutine"
+	errorx "github.com/nelthaarion/gnetplus/v2/pkg/errors"
+	"github.com/nelthaarion/gnetplus/v2/pkg/logging"
+	bbPool "github.com/nelthaarion/gnetplus/v2/pkg/pool/bytebuffer"
+	goPool "github.com/nelthaarion/gnetplus/v2/pkg/pool/goroutine"
 )
 
 var (

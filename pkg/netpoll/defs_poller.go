@@ -16,7 +16,7 @@
 
 package netpoll
 
-import "github.com/nelthaarion/gnet/v2/pkg/queue"
+import "github.com/nelthaarion/gnetplus/v2/pkg/queue"
 
 // PollEventHandler is the callback for I/O events notified by the poller.
 type PollEventHandler func(int, IOEvent, IOFlags) error

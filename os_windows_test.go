@@ -1,6 +1,6 @@
 //go:build windows
 
-package gnet
+package gnetplus
 
 import (
 	"syscall"

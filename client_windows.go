@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package gnet
+package gnetplus
 
 import (
 	"context"
@@ -20,8 +20,8 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	errorx "github.com/nelthaarion/gnet/v2/pkg/errors"
-	"github.com/nelthaarion/gnet/v2/pkg/logging"
+	errorx "github.com/nelthaarion/gnetplus/v2/pkg/errors"
+	"github.com/nelthaarion/gnetplus/v2/pkg/logging"
 )
 
 type Client struct {
@@ -36,7 +36,7 @@ func NewClient(eh EventHandler, opts ...Option) (cli *Client, err error) {
 	logger, logFlusher := logging.GetDefaultLogger(), logging.GetDefaultFlusher()
 	if options.Logger == nil {
 		if options.LogPath != "" {
-			// FIX L-8: see createListeners in gnet.go — the error was discarded, and
+			// FIX L-8: see createListeners in gnetplus.go — the error was discarded, and
 			// installing the (nil, nil) pair it returns on failure made every later
 			// logging call panic on a nil receiver.
 			fileLogger, fileFlusher, logErr := logging.CreateLoggerAsLocalFile(options.LogPath, options.LogLevel)

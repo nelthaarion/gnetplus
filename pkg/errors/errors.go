@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package errors defines common errors for gnet.
+// Package errors defines common errors for gnetplus.
 package errors
 
 import "errors"

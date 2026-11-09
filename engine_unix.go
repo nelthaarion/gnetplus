@@ -14,7 +14,7 @@
 
 //go:build darwin || dragonfly || freebsd || linux || netbsd || openbsd
 
-package gnet
+package gnetplus
 
 import (
 	"context"
@@ -25,11 +25,11 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	errorx "github.com/nelthaarion/gnet/v2/pkg/errors"
-	"github.com/nelthaarion/gnet/v2/pkg/logging"
-	"github.com/nelthaarion/gnet/v2/pkg/netpoll"
-	"github.com/nelthaarion/gnet/v2/pkg/queue"
-	"github.com/nelthaarion/gnet/v2/pkg/socket"
+	errorx "github.com/nelthaarion/gnetplus/v2/pkg/errors"
+	"github.com/nelthaarion/gnetplus/v2/pkg/logging"
+	"github.com/nelthaarion/gnetplus/v2/pkg/netpoll"
+	"github.com/nelthaarion/gnetplus/v2/pkg/queue"
+	"github.com/nelthaarion/gnetplus/v2/pkg/socket"
 )
 
 type engine struct {
@@ -296,14 +296,14 @@ func run(eventHandler EventHandler, listeners []*listener, options *Options, add
 	for _, addr := range addrs {
 		// FIX S-4: this was an unconditional Store, so a second engine registered on
 		// the same address silently replaced the first in allEngines — the earlier
-		// engine keeps running but gnet.Stop, which looks engines up by address, can
+		// engine keeps running but gnetplus.Stop, which looks engines up by address, can
 		// never reach it again: the event-loops, pollers and listeners of that engine
 		// leak for the life of the process.  LoadOrStore finds the clash without
 		// overwriting, which lets us say so; the newest engine still ends up in the
 		// map, so a later Stop stops what the caller last started.
 		if prev, loaded := allEngines.LoadOrStore(addr, &eng); loaded {
 			eng.opts.Logger.Warnf("gnet: an engine is already registered on %s (%p); "+
-				"it is replaced in the registry and can no longer be stopped with gnet.Stop, "+
+				"it is replaced in the registry and can no longer be stopped with gnetplus.Stop, "+
 				"use Engine.Stop or a distinct address", addr, prev)
 			allEngines.Store(addr, &eng)
 		}

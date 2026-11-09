@@ -14,7 +14,7 @@
 
 //go:build darwin || dragonfly || freebsd || linux || netbsd || openbsd
 
-package gnet
+package gnetplus
 
 import (
 	"net"
@@ -25,10 +25,10 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	errorx "github.com/nelthaarion/gnet/v2/pkg/errors"
-	"github.com/nelthaarion/gnet/v2/pkg/logging"
-	"github.com/nelthaarion/gnet/v2/pkg/netpoll"
-	"github.com/nelthaarion/gnet/v2/pkg/socket"
+	errorx "github.com/nelthaarion/gnetplus/v2/pkg/errors"
+	"github.com/nelthaarion/gnetplus/v2/pkg/logging"
+	"github.com/nelthaarion/gnetplus/v2/pkg/netpoll"
+	"github.com/nelthaarion/gnetplus/v2/pkg/socket"
 )
 
 type listener struct {

@@ -16,7 +16,7 @@
 
 package socket
 
-import errorx "github.com/nelthaarion/gnet/v2/pkg/errors"
+import errorx "github.com/nelthaarion/gnetplus/v2/pkg/errors"
 
 // SetBindToDevice is not implemented on *BSD because there is
 // no equivalent of Linux's SO_BINDTODEVICE.

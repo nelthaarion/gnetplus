@@ -29,10 +29,10 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	errorx "github.com/nelthaarion/gnet/v2/pkg/errors"
-	gio "github.com/nelthaarion/gnet/v2/pkg/io"
-	"github.com/nelthaarion/gnet/v2/pkg/logging"
-	"github.com/nelthaarion/gnet/v2/pkg/queue"
+	errorx "github.com/nelthaarion/gnetplus/v2/pkg/errors"
+	gio "github.com/nelthaarion/gnetplus/v2/pkg/io"
+	"github.com/nelthaarion/gnetplus/v2/pkg/logging"
+	"github.com/nelthaarion/gnetplus/v2/pkg/queue"
 )
 
 // Poller represents a poller which is in charge of monitoring file-descriptors.

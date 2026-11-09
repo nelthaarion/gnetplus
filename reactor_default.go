@@ -14,14 +14,14 @@
 
 //go:build (darwin || dragonfly || freebsd || linux || netbsd || openbsd) && !poll_opt
 
-package gnet
+package gnetplus
 
 import (
 	"errors"
 	"runtime"
 
-	errorx "github.com/nelthaarion/gnet/v2/pkg/errors"
-	"github.com/nelthaarion/gnet/v2/pkg/netpoll"
+	errorx "github.com/nelthaarion/gnetplus/v2/pkg/errors"
+	"github.com/nelthaarion/gnetplus/v2/pkg/netpoll"
 )
 
 func (el *eventloop) rotate() error {

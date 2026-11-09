@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package gnet
+package gnetplus
 
 import (
 	"context"
@@ -22,8 +22,8 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	errorx "github.com/nelthaarion/gnet/v2/pkg/errors"
-	"github.com/nelthaarion/gnet/v2/pkg/logging"
+	errorx "github.com/nelthaarion/gnetplus/v2/pkg/errors"
+	"github.com/nelthaarion/gnetplus/v2/pkg/logging"
 )
 
 type engine struct {
@@ -165,10 +165,10 @@ func run(eventHandler EventHandler, listeners []*listener, options *Options, add
 	for _, addr := range addrs {
 		// FIX S-4: see the same change in engine_unix.go — an unconditional Store
 		// hid the fact that an engine already registered on this address had just
-		// become unreachable to gnet.Stop, and therefore leaked.
+		// become unreachable to gnetplus.Stop, and therefore leaked.
 		if prev, loaded := allEngines.LoadOrStore(addr, &eng); loaded {
 			eng.opts.Logger.Warnf("gnet: an engine is already registered on %s (%p); "+
-				"it is replaced in the registry and can no longer be stopped with gnet.Stop, "+
+				"it is replaced in the registry and can no longer be stopped with gnetplus.Stop, "+
 				"use Engine.Stop or a distinct address", addr, prev)
 			allEngines.Store(addr, &eng)
 		}

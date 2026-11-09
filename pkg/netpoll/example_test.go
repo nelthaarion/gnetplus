@@ -24,8 +24,8 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/nelthaarion/gnet/v2/pkg/errors"
-	"github.com/nelthaarion/gnet/v2/pkg/netpoll"
+	"github.com/nelthaarion/gnetplus/v2/pkg/errors"
+	"github.com/nelthaarion/gnetplus/v2/pkg/netpoll"
 )
 
 func Example() {

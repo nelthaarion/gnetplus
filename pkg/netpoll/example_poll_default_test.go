@@ -16,7 +16,7 @@
 
 package netpoll_test
 
-import "github.com/nelthaarion/gnet/v2/pkg/netpoll"
+import "github.com/nelthaarion/gnetplus/v2/pkg/netpoll"
 
 // examplePoll drives the poller for the default build.
 //

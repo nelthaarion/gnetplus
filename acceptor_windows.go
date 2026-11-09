@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package gnet
+package gnetplus
 
 import (
 	"errors"
 	"net"
 	"runtime"
 
-	errorx "github.com/nelthaarion/gnet/v2/pkg/errors"
+	errorx "github.com/nelthaarion/gnetplus/v2/pkg/errors"
 )
 
 func (eng *engine) listenStream(ln net.Listener) (err error) {

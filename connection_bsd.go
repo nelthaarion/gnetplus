@@ -14,14 +14,14 @@
 
 //go:build darwin || dragonfly || freebsd || netbsd || openbsd
 
-package gnet
+package gnetplus
 
 import (
 	"io"
 
 	"golang.org/x/sys/unix"
 
-	"github.com/nelthaarion/gnet/v2/pkg/netpoll"
+	"github.com/nelthaarion/gnetplus/v2/pkg/netpoll"
 )
 
 func (c *conn) processIO(_ int, filter netpoll.IOEvent, flags netpoll.IOFlags) (err error) {

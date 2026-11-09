@@ -14,13 +14,13 @@
 
 //go:build (darwin || dragonfly || freebsd || linux || netbsd || openbsd) && poll_opt
 
-package gnet
+package gnetplus
 
 import (
 	"errors"
 	"runtime"
 
-	errorx "github.com/nelthaarion/gnet/v2/pkg/errors"
+	errorx "github.com/nelthaarion/gnetplus/v2/pkg/errors"
 )
 
 func (el *eventloop) rotate() error {

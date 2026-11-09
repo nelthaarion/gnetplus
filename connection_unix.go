@@ -14,7 +14,7 @@
 
 //go:build darwin || dragonfly || freebsd || linux || netbsd || openbsd
 
-package gnet
+package gnetplus
 
 import (
 	"io"
@@ -25,14 +25,14 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/nelthaarion/gnet/v2/internal/gfd"
-	"github.com/nelthaarion/gnet/v2/pkg/buffer/elastic"
-	errorx "github.com/nelthaarion/gnet/v2/pkg/errors"
-	gio "github.com/nelthaarion/gnet/v2/pkg/io"
-	"github.com/nelthaarion/gnet/v2/pkg/netpoll"
-	bsPool "github.com/nelthaarion/gnet/v2/pkg/pool/byteslice"
-	"github.com/nelthaarion/gnet/v2/pkg/queue"
-	"github.com/nelthaarion/gnet/v2/pkg/socket"
+	"github.com/nelthaarion/gnetplus/v2/internal/gfd"
+	"github.com/nelthaarion/gnetplus/v2/pkg/buffer/elastic"
+	errorx "github.com/nelthaarion/gnetplus/v2/pkg/errors"
+	gio "github.com/nelthaarion/gnetplus/v2/pkg/io"
+	"github.com/nelthaarion/gnetplus/v2/pkg/netpoll"
+	bsPool "github.com/nelthaarion/gnetplus/v2/pkg/pool/byteslice"
+	"github.com/nelthaarion/gnetplus/v2/pkg/queue"
+	"github.com/nelthaarion/gnetplus/v2/pkg/socket"
 )
 
 type conn struct {

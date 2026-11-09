@@ -14,7 +14,7 @@
 
 //go:build darwin || dragonfly || freebsd || linux || netbsd || openbsd
 
-package gnet
+package gnetplus
 
 import (
 	"context"
@@ -26,16 +26,16 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sys/unix"
 
-	"github.com/nelthaarion/gnet/v2/pkg/buffer/ring"
-	errorx "github.com/nelthaarion/gnet/v2/pkg/errors"
-	"github.com/nelthaarion/gnet/v2/pkg/logging"
-	"github.com/nelthaarion/gnet/v2/pkg/math"
-	"github.com/nelthaarion/gnet/v2/pkg/netpoll"
-	"github.com/nelthaarion/gnet/v2/pkg/queue"
-	"github.com/nelthaarion/gnet/v2/pkg/socket"
+	"github.com/nelthaarion/gnetplus/v2/pkg/buffer/ring"
+	errorx "github.com/nelthaarion/gnetplus/v2/pkg/errors"
+	"github.com/nelthaarion/gnetplus/v2/pkg/logging"
+	"github.com/nelthaarion/gnetplus/v2/pkg/math"
+	"github.com/nelthaarion/gnetplus/v2/pkg/netpoll"
+	"github.com/nelthaarion/gnetplus/v2/pkg/queue"
+	"github.com/nelthaarion/gnetplus/v2/pkg/socket"
 )
 
-// Client of gnet.
+// Client of gnetplus.
 type Client struct {
 	opts *Options
 	eng  *engine
@@ -50,7 +50,7 @@ func NewClient(eh EventHandler, opts ...Option) (cli *Client, err error) {
 	logger, logFlusher := logging.GetDefaultLogger(), logging.GetDefaultFlusher()
 	if options.Logger == nil {
 		if options.LogPath != "" {
-			// FIX L-8: see createListeners in gnet.go — the error was discarded, and
+			// FIX L-8: see createListeners in gnetplus.go — the error was discarded, and
 			// installing the (nil, nil) pair it returns on failure made every later
 			// logging call panic on a nil receiver.
 			fileLogger, fileFlusher, logErr := logging.CreateLoggerAsLocalFile(options.LogPath, options.LogLevel)
@@ -199,7 +199,7 @@ func (cli *Client) DialContext(network, address string, ctx any) (Conn, error) {
 	return cli.EnrollContext(c, ctx)
 }
 
-// Enroll converts a net.Conn to gnet.Conn and then adds it into the Client.
+// Enroll converts a net.Conn to gnetplus.Conn and then adds it into the Client.
 func (cli *Client) Enroll(c net.Conn) (Conn, error) {
 	return cli.EnrollContext(c, nil)
 }

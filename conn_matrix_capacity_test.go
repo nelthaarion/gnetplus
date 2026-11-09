@@ -1,11 +1,11 @@
 //go:build (darwin || dragonfly || freebsd || linux || netbsd || openbsd) && gc_opt
 
-package gnet
+package gnetplus-plus
 
 import (
 	"testing"
 
-	"github.com/nelthaarion/gnet/v2/internal/gfd"
+	"github.com/nelthaarion/gnetplus/v2/internal/gfd"
 )
 
 func TestConnMatrixReclaimsCapacity(t *testing.T) {

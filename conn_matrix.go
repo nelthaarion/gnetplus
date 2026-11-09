@@ -14,13 +14,13 @@
 
 //go:build (darwin || dragonfly || freebsd || linux || netbsd || openbsd) && gc_opt
 
-package gnet
+package gnetplus
 
 import (
 	"sync/atomic"
 
-	"github.com/nelthaarion/gnet/v2/internal/gfd"
-	errorx "github.com/nelthaarion/gnet/v2/pkg/errors"
+	"github.com/nelthaarion/gnetplus/v2/internal/gfd"
+	errorx "github.com/nelthaarion/gnetplus/v2/pkg/errors"
 )
 
 // connMatrix maintains a dense prefix of live connections. Deletion normally
@@ -37,8 +37,8 @@ type connMatrix struct {
 	// seq is this matrix's own gfd duplicate-detection counter. Using one
 	// per matrix instead of the package-global counter removes a cache line
 	// shared by every event-loop from the accept path.
-	seq    uint32
-	total  int32 // live connection count, so loadCount is O(1) not O(256)
+	seq   uint32
+	total int32 // live connection count, so loadCount is O(1) not O(256)
 }
 
 func (cm *connMatrix) init() {
