@@ -1,0 +1,408 @@
+// Copyright (c) 2019 The Gnet Authors. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package gnet
+
+import (
+	"time"
+
+	"github.com/nelthaarion/gnet/v2/pkg/logging"
+)
+
+// Option is a function that will set up option.
+type Option func(opts *Options)
+
+func loadOptions(options ...Option) *Options {
+	opts := new(Options)
+	for _, option := range options {
+		option(opts)
+	}
+	return opts
+}
+
+// TCPSocketOpt is the type of TCP socket options.
+type TCPSocketOpt int
+
+// Available TCP socket options.
+const (
+	TCPNoDelay TCPSocketOpt = iota
+	TCPDelay
+)
+
+// Options are configurations for the gnet application.
+type Options struct {
+	// LB represents the load-balancing algorithm used when assigning new connections
+	// to event loops. This option is server-only, and it is not applicable to the client.
+	LB LoadBalancing
+
+	// ReuseAddr indicates whether to set the SO_REUSEADDR socket option.
+	// This option is server-only.
+	ReuseAddr bool
+
+	// ReusePort indicates whether to set the SO_REUSEPORT socket option.
+	// This option is server-only.
+	ReusePort bool
+
+	// MulticastInterfaceIndex is the index of the interface name where the multicast UDP addresses will be bound to.
+	// This option is server-only.
+	MulticastInterfaceIndex int
+
+	// BindToDevice is the name of the interface to which the listening socket will be bound.
+	// It is only available on Linux at the moment, an error will therefore be returned when
+	// setting this option on non-linux platforms.
+	// This option is server-only.
+	BindToDevice string
+
+	// Multicore indicates whether the engine will be effectively created with multi-cores, if so,
+	// then you must take care with synchronizing memory between all event callbacks; otherwise,
+	// it will run the engine with single thread. The number of threads in the engine will be
+	// automatically assigned to the number of usable logical CPUs that can be leveraged by the
+	// current process.
+	Multicore bool
+
+	// NumEventLoop is set up to start the given number of event-loop goroutines.
+	// Note that a non-negative NumEventLoop will override Multicore.
+	NumEventLoop int
+
+	// ReadBufferCap is the maximum number of bytes that can be read from the remote when the readable event comes.
+	// The default value is 64KB, it can either be reduced to avoid starving the subsequent connections or increased
+	// to read more data from a socket.
+	//
+	// Note that ReadBufferCap will always be converted to the least power of two integer value greater than
+	// or equal to its real amount.
+	ReadBufferCap int
+
+	// WriteBufferCap is the maximum number of bytes that a static outbound buffer can hold,
+	// if the data exceeds this value, the overflow bytes will be stored in the elastic linked list buffer.
+	// The default value is 64KB.
+	//
+	// Note that WriteBufferCap will always be converted to the least power of two integer value greater than
+	// or equal to its real amount.
+	WriteBufferCap int
+
+	// LockOSThread is used to determine whether each I/O event-loop should be associated to an OS thread,
+	// it is useful when you need some kind of mechanisms like thread local storage, or invoke certain C
+	// libraries (such as graphics lib: GLib) that require thread-level manipulation via cgo, or want all I/O
+	// event-loops to actually run in parallel for a potential higher performance.
+	LockOSThread bool
+
+	// NoPollYield disables the scheduler yield that an event-loop performs when it runs out of
+	// events: an idle loop polls once more without blocking and, if that finds nothing,
+	// calls runtime.Gosched so that goroutines which the event callbacks have just made runnable
+	// (worker pools, goroutines that call AsyncWrite, ...) run on the loop's P immediately before
+	// the loop blocks in the kernel. That detour costs a trip through the Go scheduler (and, in a
+	// process with several Ps, usually a futex wake-up of another thread) plus one extra
+	// system call on every idle transition, and buys nothing for a server that handles its
+	// traffic inline in OnTraffic and never hands work to other goroutines.
+	//
+	// By default the yield is adaptive for the event-loops that serve established connections, in a
+	// process that has more Ps (GOMAXPROCS) than event-loops: such a loop yields while other
+	// goroutines have recently handed work to it (AsyncWrite, Wake, Close from outside the loop,
+	// connections accepted by the main reactor, ...), which is the sign that goroutines may be
+	// waiting for its P, and goes straight back to the blocking wait while it serves its traffic
+	// inline; goroutines that its callbacks make runnable can then run on a P that no loop is
+	// using. Everywhere else the loop yields as before: the loops that accept connections
+	// themselves (the main reactor, and the loops of a ReusePort server), a server with as many
+	// loops as Ps (which is what Multicore gives), a process with a single P, and loops that are
+	// locked to their thread (LockOSThread). Goroutines that a callback spawns and that never call
+	// back into the engine are, while a loop is not yielding, scheduled by the runtime in the usual
+	// way (an idle P picks them up) and no longer run at the loop's next idle transition; see
+	// AlwaysPollYield.
+	//
+	// Set NoPollYield to skip the yield altogether, also for loops that are fed from other
+	// goroutines. The effect is largest at low and medium concurrency, where almost every request
+	// is its own batch of events: there the yield cost about a sixth of the server's CPU time per
+	// request in the benchmarks that come with this repository; under saturating load it makes no
+	// difference. Be careful with it together with LockOSThread in a process that has fewer Ps
+	// than locked loops: the yield is then what hands the P over to the next locked loop.
+	NoPollYield bool
+
+	// AlwaysPollYield makes every idle event-loop yield to the scheduler before it blocks, whether or
+	// not other goroutines have recently handed work to it: the behavior of upstream gnet and the
+	// default of this fork before the yield became adaptive, see NoPollYield. Set it if callbacks
+	// spawn goroutines that run without ever calling back into the engine (so the loop has no way
+	// to know that they are waiting) and that must not wait for another P to pick them up.
+	// NoPollYield takes precedence when both are set.
+	AlwaysPollYield bool
+
+	// NoWriteCoalescing turns off write coalescing. By default (level-triggered mode only) the
+	// first Write of an OnTraffic callback is sent to the kernel right away and every further Write
+	// of the same callback is appended to the outbound buffer and sent with a single write(2) when
+	// the callback returns, so that a callback which answers N pipelined requests with N Writes costs
+	// two system calls instead of N. A connection whose previous callback wrote more than once is
+	// taken to be pipelining and holds back the first Write too, as long as it is small (4 KiB or
+	// less), which brings the N Writes down to a single system call; a callback that writes only
+	// once puts the connection back to the direct first Write. The byte stream the peer sees is the
+	// same in every case.
+	//
+	// The differences are visible only to the callback itself: Conn.OutboundBuffered reports the
+	// buffered bytes until the callback returns, a failure of the deferred write surfaces through
+	// OnClose instead of as the error of the Write call, and the data of a held-back Write leaves
+	// when the callback returns rather than inside it (call Conn.Flush to push it out earlier).
+	// Set NoWriteCoalescing for the strict "every Write is a write(2) right now" behavior of
+	// upstream gnet.
+	NoWriteCoalescing bool
+
+	// Ticker indicates whether the ticker has been set up.
+	Ticker bool
+
+	// TCPKeepAlive enables the TCP keep-alive mechanism (SO_KEEPALIVE) and set its value
+	// on TCP_KEEPIDLE.
+	// When TCPKeepInterval is not set, 1/5 of TCPKeepAlive will be set on TCP_KEEPINTVL,
+	// and 5 will be set on TCP_KEEPCNT if TCPKeepCount is not assigned to a positive value.
+	TCPKeepAlive time.Duration
+
+	// TCPKeepInterval is the value for TCP_KEEPINTVL, it's the interval between
+	// TCP keep-alive probes.
+	TCPKeepInterval time.Duration
+
+	// TCPKeepCount is the number of keep-alive probes that will be sent before
+	// the connection is considered dead and dropped.
+	TCPKeepCount int
+
+	// TCPNoDelay controls whether the operating system should delay
+	// packet transmission in hopes of sending fewer packets (Nagle's algorithm).
+	// When this option is assigned to TCPNoDelay, TCP_NODELAY socket option will
+	// be turned on, on the contrary, if it is assigned to TCPDelay, the socket
+	// option will be turned off.
+	//
+	// The default is TCPNoDelay, meaning that TCP_NODELAY is turned on and data
+	// will not be buffered but sent as soon as possible after a write operation.
+	TCPNoDelay TCPSocketOpt
+
+	// SocketRecvBuffer sets the maximum socket receive buffer of kernel in bytes.
+	SocketRecvBuffer int
+
+	// SocketSendBuffer sets the maximum socket send buffer of kernel in bytes.
+	SocketSendBuffer int
+
+	// LogPath specifies a local path where logs will be written, this is the easiest
+	// way to set up logging, gnet instantiates a default uber-go/zap logger with this
+	// given log path, you are also allowed to employ your own logger during the lifetime
+	// by implementing the following logging.Logger interface.
+	//
+	// Note that this option can be overridden by a non-nil option Logger.
+	LogPath string
+
+	// LogLevel specifies the logging level, it should be used along with LogPath.
+	LogLevel logging.Level
+
+	// Logger is the customized logger for logging info, if it is not set,
+	// then gnet will use the default logger powered by go.uber.org/zap.
+	Logger logging.Logger
+
+	// EdgeTriggeredIO enables the edge-triggered I/O for the underlying epoll/kqueue event-loop.
+	// Don't enable it unless you are 100% sure what you are doing.
+	// Note that this option is only available for stream-oriented protocol.
+	EdgeTriggeredIO bool
+
+	// EdgeTriggeredIOChunk specifies the number of bytes that `gnet` can
+	// read/write up to in one event loop of ET. This option implies
+	// EdgeTriggeredIO when it is set to a value greater than 0.
+	// If EdgeTriggeredIO is set to true and EdgeTriggeredIOChunk is not set,
+	// 1MB is used. The value of EdgeTriggeredIOChunk must be a power of 2,
+	// otherwise, it will be rounded up to the nearest power of 2.
+	EdgeTriggeredIOChunk int
+}
+
+// WithOptions sets up all options.
+func WithOptions(options Options) Option {
+	return func(opts *Options) {
+		*opts = options
+	}
+}
+
+// WithMulticore enables multi-cores mode for gnet engine.
+func WithMulticore(multicore bool) Option {
+	return func(opts *Options) {
+		opts.Multicore = multicore
+	}
+}
+
+// WithLockOSThread enables LockOSThread mode for I/O event-loops.
+func WithLockOSThread(lockOSThread bool) Option {
+	return func(opts *Options) {
+		opts.LockOSThread = lockOSThread
+	}
+}
+
+// WithNoWriteCoalescing turns off write coalescing, see Options.NoWriteCoalescing: every Write goes
+// to the kernel immediately, as in upstream gnet.
+func WithNoWriteCoalescing(noWriteCoalescing bool) Option {
+	return func(opts *Options) {
+		opts.NoWriteCoalescing = noWriteCoalescing
+	}
+}
+
+// WithNoPollYield turns off the scheduler yield that an idle event-loop performs before it blocks
+// in the kernel, see Options.NoPollYield. It is meant for servers that process traffic inline in
+// OnTraffic; leave it off if callbacks hand work to other goroutines.
+func WithNoPollYield(noPollYield bool) Option {
+	return func(opts *Options) {
+		opts.NoPollYield = noPollYield
+	}
+}
+
+// WithAlwaysPollYield makes every idle event-loop yield to the scheduler before it blocks in the
+// kernel, see Options.AlwaysPollYield.
+func WithAlwaysPollYield(alwaysPollYield bool) Option {
+	return func(opts *Options) {
+		opts.AlwaysPollYield = alwaysPollYield
+	}
+}
+
+// WithReadBufferCap sets ReadBufferCap for reading bytes.
+func WithReadBufferCap(readBufferCap int) Option {
+	return func(opts *Options) {
+		opts.ReadBufferCap = readBufferCap
+	}
+}
+
+// WithWriteBufferCap sets WriteBufferCap for pending bytes.
+func WithWriteBufferCap(writeBufferCap int) Option {
+	return func(opts *Options) {
+		opts.WriteBufferCap = writeBufferCap
+	}
+}
+
+// WithLoadBalancing picks the load-balancing algorithm for gnet engine.
+func WithLoadBalancing(lb LoadBalancing) Option {
+	return func(opts *Options) {
+		opts.LB = lb
+	}
+}
+
+// WithNumEventLoop sets the number of event loops for gnet engine.
+func WithNumEventLoop(numEventLoop int) Option {
+	return func(opts *Options) {
+		opts.NumEventLoop = numEventLoop
+	}
+}
+
+// WithReusePort sets SO_REUSEPORT socket option.
+func WithReusePort(reusePort bool) Option {
+	return func(opts *Options) {
+		opts.ReusePort = reusePort
+	}
+}
+
+// WithReuseAddr sets SO_REUSEADDR socket option.
+func WithReuseAddr(reuseAddr bool) Option {
+	return func(opts *Options) {
+		opts.ReuseAddr = reuseAddr
+	}
+}
+
+// WithTCPKeepAlive enables the TCP keep-alive mechanism and sets its values.
+func WithTCPKeepAlive(tcpKeepAlive time.Duration) Option {
+	return func(opts *Options) {
+		opts.TCPKeepAlive = tcpKeepAlive
+	}
+}
+
+// WithTCPKeepInterval sets the interval between TCP keep-alive probes.
+func WithTCPKeepInterval(tcpKeepInterval time.Duration) Option {
+	return func(opts *Options) {
+		opts.TCPKeepInterval = tcpKeepInterval
+	}
+}
+
+// WithTCPKeepCount sets the number of keep-alive probes that will be sent before
+// the connection is considered dead and dropped.
+func WithTCPKeepCount(tcpKeepCount int) Option {
+	return func(opts *Options) {
+		opts.TCPKeepCount = tcpKeepCount
+	}
+}
+
+// WithTCPNoDelay enable/disable the TCP_NODELAY socket option.
+func WithTCPNoDelay(tcpNoDelay TCPSocketOpt) Option {
+	return func(opts *Options) {
+		opts.TCPNoDelay = tcpNoDelay
+	}
+}
+
+// WithSocketRecvBuffer sets the maximum socket receive buffer of kernel in bytes.
+func WithSocketRecvBuffer(recvBuf int) Option {
+	return func(opts *Options) {
+		opts.SocketRecvBuffer = recvBuf
+	}
+}
+
+// WithSocketSendBuffer sets the maximum socket send buffer of kernel in bytes.
+func WithSocketSendBuffer(sendBuf int) Option {
+	return func(opts *Options) {
+		opts.SocketSendBuffer = sendBuf
+	}
+}
+
+// WithTicker indicates whether a ticker is currently set.
+func WithTicker(ticker bool) Option {
+	return func(opts *Options) {
+		opts.Ticker = ticker
+	}
+}
+
+// WithLogPath specifies a local path for logging file.
+func WithLogPath(fileName string) Option {
+	return func(opts *Options) {
+		opts.LogPath = fileName
+	}
+}
+
+// WithLogLevel specifies the logging level for the local logging file.
+func WithLogLevel(lvl logging.Level) Option {
+	return func(opts *Options) {
+		opts.LogLevel = lvl
+	}
+}
+
+// WithLogger specifies a customized logger.
+func WithLogger(logger logging.Logger) Option {
+	return func(opts *Options) {
+		opts.Logger = logger
+	}
+}
+
+// WithMulticastInterfaceIndex sets the interface name where UDP multicast sockets will be bound to.
+func WithMulticastInterfaceIndex(idx int) Option {
+	return func(opts *Options) {
+		opts.MulticastInterfaceIndex = idx
+	}
+}
+
+// WithBindToDevice sets the name of the interface to which the listening socket will be bound.
+//
+// It is only available on Linux at the moment, an error will therefore be returned when
+// setting this option on non-linux platforms.
+func WithBindToDevice(iface string) Option {
+	return func(opts *Options) {
+		opts.BindToDevice = iface
+	}
+}
+
+// WithEdgeTriggeredIO enables the edge-triggered I/O for the underlying epoll/kqueue event-loop.
+func WithEdgeTriggeredIO(et bool) Option {
+	return func(opts *Options) {
+		opts.EdgeTriggeredIO = et
+	}
+}
+
+// WithEdgeTriggeredIOChunk sets the number of bytes that `gnet` can
+// read/write up to in one event loop of ET.
+func WithEdgeTriggeredIOChunk(chunk int) Option {
+	return func(opts *Options) {
+		opts.EdgeTriggeredIOChunk = chunk
+	}
+}
