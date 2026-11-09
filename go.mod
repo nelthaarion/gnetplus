@@ -1,4 +1,4 @@
-module github.com/nelthaarion/gnet/v2
+module github.com/nelthaarion/gnet-plus/v2
 
 require (
 	github.com/nelthaarion/ants/v2 v2.12.1
