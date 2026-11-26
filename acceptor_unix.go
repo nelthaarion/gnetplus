@@ -64,7 +64,7 @@ func (el *eventloop) accept0(fd int, _ netpoll.IOEvent, _ netpoll.IOFlags) error
 
 		el := el.engine.eventLoops.next(remoteAddr)
 		c := newStreamConn(network, nfd, el, sa, el.listeners[fd].addr, remoteAddr)
-		err = el.poller.Trigger(queue.HighPriority, el.register, c)
+		err = el.poller.Trigger(queue.HighPriority, registerConnTask, c)
 		if err != nil {
 			el.getLogger().Errorf("failed to enqueue the accepted socket fd=%d to poller: %v", c.fd, err)
 			_ = unix.Close(nfd)

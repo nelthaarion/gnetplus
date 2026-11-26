@@ -24,6 +24,11 @@ import (
 	"github.com/nelthaarion/gnetplus/v2/pkg/netpoll"
 )
 
+// initConnPollAttachment is a no-op without poll_opt: the default reactor
+// dispatches via el.connections.getConn(fd) -> c.processIO directly, so we
+// skip allocating the c.processIO method-value closure on every accept.
+func initConnPollAttachment(_ *conn) {}
+
 func (el *eventloop) rotate() error {
 	if el.engine.opts.LockOSThread {
 		runtime.LockOSThread()

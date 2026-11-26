@@ -22,8 +22,15 @@ import (
 	"github.com/nelthaarion/gnetplus/v2/internal/gfd"
 )
 
+// fastFDLimit caps the direct-indexed FD slice used to bypass map hashing on
+// every epoll/kqueue event. Linux assigns dense small FDs starting at 3, so
+// nearly every connection resolves with a single bounds-checked slice load;
+// FDs at or above the cap fall back to connMap transparently.
+const fastFDLimit = 65536
+
 type connMatrix struct {
 	connCount int32
+	fast      []*conn
 	connMap   map[int]*conn
 	// seq is this matrix's own gfd duplicate-detection counter; see
 	// conn_matrix.go for why it is per-matrix and not package-global.
@@ -32,6 +39,7 @@ type connMatrix struct {
 
 func (cm *connMatrix) init() {
 	cm.connMap = make(map[int]*conn)
+	cm.fast = make([]*conn, 64)
 }
 
 func (cm *connMatrix) iterate(f func(*conn) bool) {
@@ -52,21 +60,46 @@ func (cm *connMatrix) loadCount() (n int32) {
 	return atomic.LoadInt32(&cm.connCount)
 }
 
-// addConn registers c in the map.  Unlike the matrix-backed implementation this
-// one grows on demand, so it never runs out of room and never fails.
+// addConn registers c in the map and direct FD table. Unlike the matrix-backed
+// implementation this one grows on demand, so it never runs out of room and
+// never fails.
 func (cm *connMatrix) addConn(c *conn, index int) error {
 	c.gfd = gfd.NewGFDWithSeq(c.fd, index, 0, 0, &cm.seq)
 	cm.connMap[c.fd] = c
+	if fd := c.fd; fd >= 0 && fd < fastFDLimit {
+		if fd >= len(cm.fast) {
+			newCap := len(cm.fast)
+			if newCap == 0 {
+				newCap = 64
+			}
+			for newCap <= fd {
+				newCap <<= 1
+			}
+			if newCap > fastFDLimit {
+				newCap = fastFDLimit
+			}
+			grown := make([]*conn, newCap)
+			copy(grown, cm.fast)
+			cm.fast = grown
+		}
+		cm.fast[fd] = c
+	}
 	cm.incCount(0, 1)
 	return nil
 }
 
 func (cm *connMatrix) delConn(c *conn) {
+	if fd := c.fd; uint(fd) < uint(len(cm.fast)) {
+		cm.fast[fd] = nil
+	}
 	delete(cm.connMap, c.fd)
 	cm.incCount(0, -1)
 }
 
 func (cm *connMatrix) getConn(fd int) *conn {
+	if uint(fd) < uint(len(cm.fast)) {
+		return cm.fast[fd]
+	}
 	return cm.connMap[fd]
 }
 

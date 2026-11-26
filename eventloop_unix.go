@@ -351,8 +351,10 @@ loop:
 	case Shutdown:
 		return errorx.ErrEngineShutdown
 	}
-	_, _ = c.inboundBuffer.Write(c.buffer)
-	c.buffer = c.buffer[:0]
+	if len(c.buffer) > 0 {
+		_, _ = c.inboundBuffer.Write(c.buffer)
+		c.buffer = c.buffer[:0]
+	}
 
 	if c.isEOF || (isET && recv < chunk) {
 		goto loop
@@ -363,10 +365,25 @@ loop:
 	// on each event-loop. If the threshold is reached and there are still
 	// unread data in the socket buffer, we must issue another read event manually.
 	if isET && n == len(el.buffer) {
-		return el.poller.Trigger(queue.LowPriority, el.read0, c)
+		return el.poller.Trigger(queue.LowPriority, readConnTask, c)
 	}
 
 	return nil
+}
+
+func readConnTask(a any) error {
+	c := a.(*conn)
+	return c.loop.read(c)
+}
+
+func writeConnTask(a any) error {
+	c := a.(*conn)
+	return c.loop.write(c)
+}
+
+func registerConnTask(a any) error {
+	c := a.(*conn)
+	return c.loop.register0(c)
 }
 
 func (el *eventloop) write0(a any) error {
@@ -389,23 +406,32 @@ func (el *eventloop) write(c *conn) error {
 		err  error
 	)
 loop:
-	iov, _ := c.outboundBuffer.Peek(-1)
-	// Fast path: Peek always reports the ring-buffer as two slices (head, tail)
-	// even when the data is a single contiguous run, so a plain write(2) is the
-	// right call whenever the tail is empty. The old code took the writev branch
-	// unconditionally in that case, paying an extra iovec and a heavier syscall
-	// per flush on the overwhelmingly common single-segment buffer.
-	if len(iov) == 2 && len(iov[1]) == 0 {
-		n, err = gio.WriteSocketNB(c.fd, iov[0])
-	} else if len(iov) > 1 {
-		if len(iov) > iovMax {
-			iov = iov[:iovMax]
+	// Fast path: when everything sits in the ring part of the buffer, send
+	// directly without Peek(-1)'s [][]byte heap allocation.
+	if head, tail, complete := c.outboundBuffer.PeekStatic(); complete && len(head) > 0 {
+		if len(tail) == 0 {
+			n, err = gio.WriteSocketNB(c.fd, head)
+		} else {
+			var iov [2][]byte
+			iov[0], iov[1] = head, tail
+			n, err = gio.Writev(c.fd, iov[:])
 		}
-		n, err = gio.Writev(c.fd, iov)
 	} else {
-		n, err = gio.WriteSocketNB(c.fd, iov[0])
+		iov, _ := c.outboundBuffer.Peek(-1)
+		if len(iov) == 2 && len(iov[1]) == 0 {
+			n, err = gio.WriteSocketNB(c.fd, iov[0])
+		} else if len(iov) > 1 {
+			if len(iov) > iovMax {
+				iov = iov[:iovMax]
+			}
+			n, err = gio.Writev(c.fd, iov)
+		} else if len(iov) == 1 {
+			n, err = gio.WriteSocketNB(c.fd, iov[0])
+		}
 	}
-	_, _ = c.outboundBuffer.Discard(n)
+	if n > 0 {
+		_, _ = c.outboundBuffer.Discard(n)
+	}
 	switch err {
 	case nil:
 	case unix.EAGAIN:
@@ -430,7 +456,7 @@ loop:
 	// on each event-loop. If the threshold is reached and there are still
 	// pending data to write, we must issue another write event manually.
 	if isET && !c.outboundBuffer.IsEmpty() {
-		return el.poller.Trigger(queue.HighPriority, el.write0, c)
+		return el.poller.Trigger(queue.HighPriority, writeConnTask, c)
 	}
 
 	return nil
@@ -451,14 +477,22 @@ func (el *eventloop) flushCoalesced(c *conn) error {
 			n   int
 			err error
 		)
-		// Common case: everything sits in the ring part of the buffer, send the
-		// first contiguous run with the single-buffer socket syscall and no allocation.
-		if head, _, _ := c.outboundBuffer.PeekStatic(); len(head) > 0 {
-			n, err = gio.WriteSocketNB(c.fd, head)
+		// Common case: data sits in the ring part of the buffer, send without
+		// Peek(-1)'s [][]byte allocation. When the ring wrapped around, gather
+		// head+tail into one Writev syscall instead of two separate writes.
+		if head, tail, _ := c.outboundBuffer.PeekStatic(); len(head) > 0 {
+			want := len(head) + len(tail)
+			if len(tail) == 0 {
+				n, err = gio.WriteSocketNB(c.fd, head)
+			} else {
+				var iov [2][]byte
+				iov[0], iov[1] = head, tail
+				n, err = gio.Writev(c.fd, iov[:])
+			}
 			if n > 0 {
 				_, _ = c.outboundBuffer.Discard(n)
 			}
-			if err == nil && n < len(head) {
+			if err == nil && n < want {
 				break // the socket buffer is full, wait for EPOLLOUT
 			}
 		} else { // only the list part holds data: gather it with writev
@@ -502,14 +536,31 @@ func (el *eventloop) close(c *conn, err error) error {
 	// FIX P-6: The previous code silently discarded write errors here (only `break` on error,
 	// no logging). Log the error so operators know when data was lost during teardown.
 	for !c.outboundBuffer.IsEmpty() {
-		iov, _ := c.outboundBuffer.Peek(0)
-		if len(iov) > iovMax {
-			iov = iov[:iovMax]
+		var (
+			n    int
+			werr error
+		)
+		if head, tail, complete := c.outboundBuffer.PeekStatic(); complete && len(head) > 0 {
+			if len(tail) == 0 {
+				n, werr = gio.WriteSocketNB(c.fd, head)
+			} else {
+				var iov [2][]byte
+				iov[0], iov[1] = head, tail
+				n, werr = gio.Writev(c.fd, iov[:])
+			}
+		} else {
+			iov, _ := c.outboundBuffer.Peek(0)
+			if len(iov) > iovMax {
+				iov = iov[:iovMax]
+			}
+			n, werr = gio.Writev(c.fd, iov)
 		}
-		n, werr := gio.Writev(c.fd, iov)
 		if werr != nil {
 			el.getLogger().Warnf("failed to flush outbound buffer on close for fd=%d: %v",
 				c.fd, os.NewSyscallError("writev", werr))
+			break
+		}
+		if n <= 0 {
 			break
 		}
 		_, _ = c.outboundBuffer.Discard(n)

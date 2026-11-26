@@ -20,6 +20,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -129,7 +130,7 @@ func newStreamConn(proto string, fd int, el *eventloop, sa unix.Sockaddr, localA
 		remoteAddr:     remoteAddr,
 		pollAttachment: netpoll.PollAttachment{FD: fd},
 	}
-	c.pollAttachment.Callback = c.processIO
+	initConnPollAttachment(c)
 	c.outboundBuffer.Reset(el.engine.opts.WriteBufferCap)
 	return
 }
@@ -329,14 +330,10 @@ func (c *conn) writev(bs [][]byte) (n int, err error) {
 		bs = bs[:iovMax]
 	}
 
-	defer func() {
-		if err != nil {
-			_ = c.loop.close(c, os.NewSyscallError("writev", err))
-		}
-	}()
-
 	// remaining counts every byte handed to this method, including the overflow that
 	// is never attempted, so the tail of the function buffers exactly what is left.
+	// Error paths close the connection inline (matching conn.write) so the hot
+	// path has no deferred closure.
 	remaining := n
 	var sent int
 loop:
@@ -353,8 +350,12 @@ loop:
 			if !isET {
 				err = c.loop.poller.ModReadWrite(&c.pollAttachment, isET)
 			}
+			if err != nil {
+				_ = c.loop.close(c, os.NewSyscallError("writev", err))
+			}
 			return
 		}
+		_ = c.loop.close(c, os.NewSyscallError("writev", err))
 		return 0, err
 	}
 	pos := len(bs)
@@ -386,51 +387,80 @@ loop:
 			_, _ = c.outboundBuffer.Writev(overflow)
 		}
 		err = c.loop.poller.ModReadWrite(&c.pollAttachment, isET)
+		if err != nil {
+			_ = c.loop.close(c, os.NewSyscallError("writev", err))
+		}
 	}
 
 	return
 }
 
 type asyncWriteHook struct {
+	c        *conn
 	callback AsyncCallback
 	data     []byte
 }
 
-func (c *conn) asyncWrite(a any) (err error) {
+var asyncWriteHookPool = sync.Pool{
+	New: func() any { return new(asyncWriteHook) },
+}
+
+func runAsyncWrite(a any) (err error) {
 	hook := a.(*asyncWriteHook)
-	defer func() {
-		if hook.callback != nil {
-			_ = hook.callback(c, err)
-		}
-	}()
+	c := hook.c
+	cb := hook.callback
+	data := hook.data
+	*hook = asyncWriteHook{}
+	asyncWriteHookPool.Put(hook)
 
 	if !c.opened {
-		return net.ErrClosed
+		err = net.ErrClosed
+	} else {
+		_, err = c.write(data)
 	}
-
-	_, err = c.write(hook.data)
+	if cb != nil {
+		_ = cb(c, err)
+	}
 	return
 }
 
 type asyncWritevHook struct {
+	c        *conn
 	callback AsyncCallback
 	data     [][]byte
 }
 
-func (c *conn) asyncWritev(a any) (err error) {
+var asyncWritevHookPool = sync.Pool{
+	New: func() any { return new(asyncWritevHook) },
+}
+
+func runAsyncWritev(a any) (err error) {
 	hook := a.(*asyncWritevHook)
-	defer func() {
-		if hook.callback != nil {
-			_ = hook.callback(c, err)
-		}
-	}()
+	c := hook.c
+	cb := hook.callback
+	data := hook.data
+	*hook = asyncWritevHook{}
+	asyncWritevHookPool.Put(hook)
 
 	if !c.opened {
-		return net.ErrClosed
+		err = net.ErrClosed
+	} else {
+		_, err = c.writev(data)
 	}
-
-	_, err = c.writev(hook.data)
+	if cb != nil {
+		_ = cb(c, err)
+	}
 	return
+}
+
+func wakeConnTask(a any) error {
+	c := a.(*conn)
+	return c.loop.wake(c)
+}
+
+func closeConnTask(a any) error {
+	c := a.(*conn)
+	return c.loop.close(c, nil)
 }
 
 func (c *conn) sendTo(buf []byte, addr unix.Sockaddr) (n int, err error) {
@@ -483,17 +513,23 @@ func (c *conn) Read(p []byte) (n int, err error) {
 // or Discard() can return it to the pool. release() also returns any
 // outstanding c.cache slice (see FIX P-8 in release()).
 func (c *conn) Next(n int) (buf []byte, err error) {
+	if c.inboundBuffer.IsEmpty() {
+		if n > len(c.buffer) {
+			return nil, io.ErrShortBuffer
+		}
+		if n <= 0 {
+			n = len(c.buffer)
+		}
+		buf = c.buffer[:n]
+		c.buffer = c.buffer[n:]
+		return
+	}
+
 	inBufferLen := c.inboundBuffer.Buffered()
 	if totalLen := inBufferLen + len(c.buffer); n > totalLen {
 		return nil, io.ErrShortBuffer
 	} else if n <= 0 {
 		n = totalLen
-	}
-
-	if c.inboundBuffer.IsEmpty() {
-		buf = c.buffer[:n]
-		c.buffer = c.buffer[n:]
-		return
 	}
 
 	// Free any previous pool slice before allocating a new one.
@@ -510,15 +546,21 @@ func (c *conn) Next(n int) (buf []byte, err error) {
 }
 
 func (c *conn) Peek(n int) (buf []byte, err error) {
+	if c.inboundBuffer.IsEmpty() {
+		if n > len(c.buffer) {
+			return nil, io.ErrShortBuffer
+		}
+		if n <= 0 {
+			n = len(c.buffer)
+		}
+		return c.buffer[:n], nil
+	}
+
 	inBufferLen := c.inboundBuffer.Buffered()
 	if totalLen := inBufferLen + len(c.buffer); n > totalLen {
 		return nil, io.ErrShortBuffer
 	} else if n <= 0 {
 		n = totalLen
-	}
-
-	if c.inboundBuffer.IsEmpty() {
-		return c.buffer[:n], err
 	}
 
 	head, tail := c.inboundBuffer.Peek(n)
@@ -542,15 +584,20 @@ func (c *conn) Discard(n int) (int, error) {
 		c.cache = nil
 	}
 
+	if c.inboundBuffer.IsEmpty() {
+		if n >= len(c.buffer) || n <= 0 {
+			totalLen := len(c.buffer)
+			c.buffer = c.buffer[:0]
+			return totalLen, nil
+		}
+		c.buffer = c.buffer[n:]
+		return n, nil
+	}
+
 	inBufferLen := c.inboundBuffer.Buffered()
 	if totalLen := inBufferLen + len(c.buffer); n >= totalLen || n <= 0 {
 		c.resetBuffer()
 		return totalLen, nil
-	}
-
-	if c.inboundBuffer.IsEmpty() {
-		c.buffer = c.buffer[n:]
-		return n, nil
 	}
 
 	discarded, _ := c.inboundBuffer.Discard(n)
@@ -668,41 +715,58 @@ func (c *conn) AsyncWrite(buf []byte, callback AsyncCallback) error {
 		}
 		return err
 	}
-	return c.loop.poller.Trigger(queue.HighPriority, c.asyncWrite, &asyncWriteHook{callback, buf})
+	hook := asyncWriteHookPool.Get().(*asyncWriteHook)
+	hook.c = c
+	hook.callback = callback
+	hook.data = buf
+	if err := c.loop.poller.Trigger(queue.HighPriority, runAsyncWrite, hook); err != nil {
+		*hook = asyncWriteHook{}
+		asyncWriteHookPool.Put(hook)
+		return err
+	}
+	return nil
 }
 
 func (c *conn) AsyncWritev(bs [][]byte, callback AsyncCallback) error {
 	if c.isDatagram {
 		return errorx.ErrUnsupportedOp
 	}
-	return c.loop.poller.Trigger(queue.HighPriority, c.asyncWritev, &asyncWritevHook{callback, bs})
+	hook := asyncWritevHookPool.Get().(*asyncWritevHook)
+	hook.c = c
+	hook.callback = callback
+	hook.data = bs
+	if err := c.loop.poller.Trigger(queue.HighPriority, runAsyncWritev, hook); err != nil {
+		*hook = asyncWritevHook{}
+		asyncWritevHookPool.Put(hook)
+		return err
+	}
+	return nil
 }
 
 func (c *conn) Wake(callback AsyncCallback) error {
+	if callback == nil {
+		return c.loop.poller.Trigger(queue.LowPriority, wakeConnTask, c)
+	}
 	return c.loop.poller.Trigger(queue.LowPriority, func(_ any) (err error) {
 		err = c.loop.wake(c)
-		if callback != nil {
-			_ = callback(c, err)
-		}
+		_ = callback(c, err)
 		return
 	}, nil)
 }
 
 func (c *conn) CloseWithCallback(callback AsyncCallback) error {
+	if callback == nil {
+		return c.loop.poller.Trigger(queue.LowPriority, closeConnTask, c)
+	}
 	return c.loop.poller.Trigger(queue.LowPriority, func(_ any) (err error) {
 		err = c.loop.close(c, nil)
-		if callback != nil {
-			_ = callback(c, err)
-		}
+		_ = callback(c, err)
 		return
 	}, nil)
 }
 
 func (c *conn) Close() error {
-	return c.loop.poller.Trigger(queue.LowPriority, func(_ any) (err error) {
-		err = c.loop.close(c, nil)
-		return
-	}, nil)
+	return c.loop.poller.Trigger(queue.LowPriority, closeConnTask, c)
 }
 
 func (c *conn) EventLoop() EventLoop {

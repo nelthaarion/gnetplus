@@ -23,6 +23,8 @@ import (
 	errorx "github.com/nelthaarion/gnetplus/v2/pkg/errors"
 )
 
+const fastFDLimit = 65536
+
 // connMatrix maintains a dense prefix of live connections. Deletion normally
 // swaps in the final connection in O(1). During iteration moves are deferred,
 // so callbacks cannot skip connections by deleting them.
@@ -31,6 +33,7 @@ type connMatrix struct {
 	connCounts     [gfd.ConnMatrixRowMax]int32
 	tailRow        int
 	tailCol        int
+	fast           []*conn
 	table          [gfd.ConnMatrixRowMax][]*conn
 	fd2gfd         map[int]gfd.GFD
 	dirty          bool
@@ -43,6 +46,7 @@ type connMatrix struct {
 
 func (cm *connMatrix) init() {
 	cm.fd2gfd = make(map[int]gfd.GFD)
+	cm.fast = make([]*conn, 64)
 }
 
 func (cm *connMatrix) iterate(f func(*conn) bool) {
@@ -86,6 +90,24 @@ func (cm *connMatrix) addConn(c *conn, index int) error {
 	c.gfd = gfd.NewGFDWithSeq(c.fd, index, cm.tailRow, cm.tailCol, &cm.seq)
 	cm.fd2gfd[c.fd] = c.gfd
 	cm.table[cm.tailRow][cm.tailCol] = c
+	if fd := c.fd; fd >= 0 && fd < fastFDLimit {
+		if fd >= len(cm.fast) {
+			newCap := len(cm.fast)
+			if newCap == 0 {
+				newCap = 64
+			}
+			for newCap <= fd {
+				newCap <<= 1
+			}
+			if newCap > fastFDLimit {
+				newCap = fastFDLimit
+			}
+			grown := make([]*conn, newCap)
+			copy(grown, cm.fast)
+			cm.fast = grown
+		}
+		cm.fast[fd] = c
+	}
 	cm.incCount(cm.tailRow, 1)
 	cm.setTail(cm.tailRow*gfd.ConnMatrixColumnMax + cm.tailCol + 1)
 	return nil
@@ -113,6 +135,9 @@ func (cm *connMatrix) move(c *conn, row, col int) {
 }
 
 func (cm *connMatrix) delConn(c *conn) {
+	if fd := c.fd; uint(fd) < uint(len(cm.fast)) {
+		cm.fast[fd] = nil
+	}
 	row, col := c.gfd.ConnMatrixRow(), c.gfd.ConnMatrixColumn()
 	delete(cm.fd2gfd, c.fd)
 	cm.table[row][col] = nil
@@ -156,6 +181,9 @@ func (cm *connMatrix) compact() {
 }
 
 func (cm *connMatrix) getConn(fd int) *conn {
+	if uint(fd) < uint(len(cm.fast)) {
+		return cm.fast[fd]
+	}
 	gFD, ok := cm.fd2gfd[fd]
 	if !ok || cm.table[gFD.ConnMatrixRow()] == nil {
 		return nil

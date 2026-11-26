@@ -23,6 +23,10 @@ import (
 	errorx "github.com/nelthaarion/gnetplus/v2/pkg/errors"
 )
 
+func initConnPollAttachment(c *conn) {
+	c.pollAttachment.Callback = c.processIO
+}
+
 func (el *eventloop) rotate() error {
 	if el.engine.opts.LockOSThread {
 		runtime.LockOSThread()
