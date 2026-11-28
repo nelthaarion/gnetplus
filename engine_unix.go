@@ -210,7 +210,15 @@ func (eng *engine) activateReactors(ctx context.Context, numEventLoop int) error
 }
 
 func (eng *engine) start(ctx context.Context, numEventLoop int) error {
-	if eng.opts.ReusePort {
+	// A single event-loop engine serves its own listener. That is what
+	// runEventLoops does: the loop polls the listening socket and registers each
+	// accepted connection inline. The reactor layout it replaces — a main
+	// reactor that accepts and hands every connection to a sub-reactor — exists
+	// to spread connections over several loops; with only one, it costs a task,
+	// a queue node, an eventfd write, a goroutine handoff and an extra poller
+	// (one epoll fd and one eventfd) per accepted connection, and nothing back.
+	// On a connection-churn workload that is most of the accept cost.
+	if eng.opts.ReusePort || numEventLoop == 1 {
 		return eng.runEventLoops(ctx, numEventLoop)
 	}
 

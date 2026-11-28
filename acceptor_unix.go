@@ -73,43 +73,58 @@ func (el *eventloop) accept0(fd int, _ netpoll.IOEvent, _ netpoll.IOFlags) error
 	}
 }
 
+// maxAcceptPerEvent bounds how many connections one readable event on a
+// listener may accept before the loop goes back to the poller. A burst must not
+// starve the other descriptors this loop serves; 64 is what nginx uses for the
+// same reason (accept_mutex off, multi_accept on).
+const maxAcceptPerEvent = 64
+
 func (el *eventloop) accept(fd int, ev netpoll.IOEvent, flags netpoll.IOFlags) error {
 	network := el.listeners[fd].network
 	if network == "udp" {
 		return el.readUDP(fd, ev, flags)
 	}
 
-	nfd, sa, err := socket.Accept(fd)
-	switch err {
-	case nil:
-	case unix.EINTR, unix.EAGAIN, unix.ECONNRESET, unix.ECONNABORTED:
-		// ECONNRESET or ECONNABORTED could indicate that a socket
-		// in the Accept queue was closed before we Accept()ed it.
-		// It's a silly error, let's retry it.
-		return nil
-	default:
-		el.getLogger().Errorf("Accept() failed due to error: %v", err)
-		return errors.ErrAcceptSocket
-	}
+	// The listener is registered level-triggered, so every connection still
+	// queued after this call would cost its own epoll_wait round trip. Draining
+	// the queue here turns a connection burst into one poll and as many accept(2)
+	// calls, which is the same shape the main reactor's accept0 has always had.
+	for i := 0; i < maxAcceptPerEvent; i++ {
+		nfd, sa, err := socket.Accept(fd)
+		switch err {
+		case nil:
+		case unix.EINTR, unix.EAGAIN, unix.ECONNRESET, unix.ECONNABORTED:
+			// ECONNRESET or ECONNABORTED could indicate that a socket
+			// in the Accept queue was closed before we Accept()ed it.
+			// It's a silly error, let's retry it.
+			return nil
+		default:
+			el.getLogger().Errorf("Accept() failed due to error: %v", err)
+			return errors.ErrAcceptSocket
+		}
 
-	remoteAddr := socket.SockaddrToTCPOrUnixAddr(sa)
-	if opts := el.engine.opts; opts.TCPKeepAlive > 0 && el.listeners[fd].network == "tcp" &&
-		(runtime.GOOS != "linux" && runtime.GOOS != "freebsd" && runtime.GOOS != "dragonfly") {
-		// TCP keepalive options are not inherited from the listening socket
-		// on platforms other than Linux, FreeBSD, or DragonFlyBSD.
-		// We therefore need to set them on the accepted socket explicitly.
-		//
-		// Check out https://github.com/nginx/nginx/pull/337 for details.
-		if err = setKeepAlive(
-			nfd,
-			true,
-			opts.TCPKeepAlive,
-			opts.TCPKeepInterval,
-			opts.TCPKeepCount); err != nil {
-			el.getLogger().Errorf("failed to set TCP keepalive on fd=%d: %v", fd, err)
+		remoteAddr := socket.SockaddrToTCPOrUnixAddr(sa)
+		if opts := el.engine.opts; opts.TCPKeepAlive > 0 && network == "tcp" &&
+			(runtime.GOOS != "linux" && runtime.GOOS != "freebsd" && runtime.GOOS != "dragonfly") {
+			// TCP keepalive options are not inherited from the listening socket
+			// on platforms other than Linux, FreeBSD, or DragonFlyBSD.
+			// We therefore need to set them on the accepted socket explicitly.
+			//
+			// Check out https://github.com/nginx/nginx/pull/337 for details.
+			if err = setKeepAlive(
+				nfd,
+				true,
+				opts.TCPKeepAlive,
+				opts.TCPKeepInterval,
+				opts.TCPKeepCount); err != nil {
+				el.getLogger().Errorf("failed to set TCP keepalive on fd=%d: %v", fd, err)
+			}
+		}
+
+		c := newStreamConn(network, nfd, el, sa, el.listeners[fd].addr, remoteAddr)
+		if err := el.register0(c); err != nil {
+			return err
 		}
 	}
-
-	c := newStreamConn(network, nfd, el, sa, el.listeners[fd].addr, remoteAddr)
-	return el.register0(c)
+	return nil
 }
